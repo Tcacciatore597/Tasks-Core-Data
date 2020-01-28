@@ -18,6 +18,7 @@ class TaskDetailViewController: UIViewController {
     
     @IBOutlet weak var nameTextField: UITextField!
     @IBOutlet weak var notesTextView: UITextView!
+    @IBOutlet weak var priorityControl: UISegmentedControl!
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -42,6 +43,9 @@ class TaskDetailViewController: UIViewController {
                     return
             }
             let notes = notesTextView.text
+            let priorityIndex = priorityControl.selectedSegmentIndex
+            let priority = TaskPriority.allPriorities[priorityIndex]
+            task.priority = priority.rawValue
             task.name = name
             task.notes = notes
             do {
@@ -58,6 +62,13 @@ class TaskDetailViewController: UIViewController {
         title = task?.name ?? "Create Task"
         nameTextField.text = task?.name ?? ""
         notesTextView.text = task?.notes ?? ""
+        let priority: TaskPriority
+        if let taskPriority = task?.priority {
+            priority = TaskPriority(rawValue: taskPriority)!
+        } else {
+            priority = .normal
+        }
+        priorityControl.selectedSegmentIndex = TaskPriority.allPriorities.firstIndex(of: priority) ?? 1
     }
     
     @objc private func saveTask() {
@@ -66,7 +77,9 @@ class TaskDetailViewController: UIViewController {
                 return
         }
         let notes = notesTextView.text
-        let _ = Task(name: name, notes: notes)
+        let priorityIndex = priorityControl.selectedSegmentIndex
+        let priority = TaskPriority.allPriorities[priorityIndex]
+        let _ = Task(name: name, notes: notes, priority: priority)
         
         do {
             try CoreDataStack.shared.mainContext.save()
