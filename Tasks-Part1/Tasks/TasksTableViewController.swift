@@ -35,12 +35,21 @@ class TasksTableViewController: UITableViewController {
         return frc
     }()
     
+    private let taskController = TaskController()
     // MARK: - View Lifecycle
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
         tableView.reloadData()
+    }
+    
+    //MARK: - Actions
+    
+    @IBAction func refresh(_ sender: Any) {
+        taskController.fetchTasksFromServer { _ in
+            self.refreshControl?.endRefreshing()
+        }
     }
 
     // MARK: - Table view data source
