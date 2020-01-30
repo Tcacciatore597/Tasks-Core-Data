@@ -55,10 +55,57 @@ class TaskController {
     }
     
     func sendTasksToServer(task: Task, completion: @escaping CompletionHandler = { _ in }) {
+        let uuid = task.identifier ?? UUID()
+        let requestURL = baseURL.appendingPathComponent(uuid.uuidString).appendingPathExtension("json")
+        var request = URLRequest(url: requestURL)
+        request.httpMethod = "PUT"
         
+        do {
+            guard var representation = task.taskRepresentation else {
+                completion(NSError())
+                return
+            }
+            representation.identifier = uuid.uuidString
+            task.identifier = uuid
+            try CoreDataStack.shared.save()
+            request.httpBody = try JSONEncoder().encode(representation)
+        } catch {
+            print("Error encoding task \(task): \(error)")
+            DispatchQueue.main.async {
+                completion(error)
+            }
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { ( _, _, error) in
+            if let error = error {
+                print("Error PUTting task to sercer: \(error)")
+                DispatchQueue.main.async {
+                    completion(error)
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                completion(nil)
+            }
+        }.resume()
     }
     
     func deleteTaskFromServer(_ task: Task, completion: @escaping CompletionHandler = { _ in }) {
+        guard let uuid = task.identifier else {
+            completion(NSError())
+            return
+        }
+        let requestURL = baseURL.appendingPathComponent(uuid.uuidString).appendingPathExtension("json")
+        var request = URLRequest(url: requestURL)
+        request.httpMethod = "DELETE"
+        
+        URLSession.shared.dataTask(with: request) { (_, response, error) in
+            print(response!)
+            DispatchQueue.main.async {
+                completion(error)
+            }
+        }.resume()
         
     }
     private func updateTasks(with representations:[TaskRepresentation]) throws {
@@ -69,33 +116,31 @@ class TaskController {
         let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "identifier IN %@", identifiersToFetch)
         
-        let context = CoreDataStack.shared.mainContext
+        let context = CoreDataStack.shared.container.newBackgroundContext()
         
-        do {
-            let existingTasks = try context.fetch(fetchRequest)
-            for task in existingTasks {
-                guard let id = task.identifier,
-                    let representation = representationsByID[id] else { continue }
-                self.update(task: task, with: representation)
-                tasksToCreate.removeValue(forKey: id)
+        context.perform {
+            do {
+                let existingTasks = try context.fetch(fetchRequest)
+                for task in existingTasks {
+                    guard let id = task.identifier,
+                        let representation = representationsByID[id] else { continue }
+                    self.update(task: task, with: representation)
+                    tasksToCreate.removeValue(forKey: id)
+                }
+                
+                for representation in tasksToCreate.values {
+                    Task(taskRepresentation: representation, context: context)
+                }
+            } catch {
+                print("Error fetching tasks for UUIDs: \(error)")
             }
-            
-            for representation in tasksToCreate.values {
-                Task(taskRepresentation: representation)
-            }
-        } catch {
-            print("Error fetching tasks for UUIDs: \(error)")
         }
         
-        try self.saveToPersistentStore()
+        try CoreDataStack.shared.save(context: context)
     }
     private func update(task: Task, with representation: TaskRepresentation) {
         task.name = representation.name
         task.notes = representation.notes
         task.priority = representation.priority
-    }
-    
-    private func saveToPersistentStore() throws {
-        try CoreDataStack.shared.mainContext.save()
     }
 }

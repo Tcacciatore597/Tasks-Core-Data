@@ -13,6 +13,7 @@ class TaskDetailViewController: UIViewController {
     // MARK: - Properties
     
     var task: Task?
+    var taskController: TaskController?
     
     // MARK: - Outlets
     
@@ -39,7 +40,8 @@ class TaskDetailViewController: UIViewController {
         
         if let task = task {
             guard let name = nameTextField.text,
-                !name.isEmpty else {
+                !name.isEmpty,
+                let taskController = taskController else {
                     return
             }
             let notes = notesTextView.text
@@ -48,6 +50,8 @@ class TaskDetailViewController: UIViewController {
             task.priority = priority.rawValue
             task.name = name
             task.notes = notes
+            taskController.sendTasksToServer(task: task)
+            
             do {
                 try CoreDataStack.shared.mainContext.save()
             } catch {
@@ -73,13 +77,15 @@ class TaskDetailViewController: UIViewController {
     
     @objc private func saveTask() {
         guard let name = nameTextField.text,
-            !name.isEmpty else {
+            !name.isEmpty,
+            let taskController = taskController else {
                 return
         }
         let notes = notesTextView.text
         let priorityIndex = priorityControl.selectedSegmentIndex
         let priority = TaskPriority.allPriorities[priorityIndex]
-        let _ = Task(name: name, notes: notes, priority: priority)
+        let task = Task(name: name, notes: notes, priority: priority)
+        taskController.sendTasksToServer(task: task)
         
         do {
             try CoreDataStack.shared.mainContext.save()

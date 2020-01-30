@@ -83,14 +83,20 @@ class TasksTableViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
             let task = fetchedResultsController.object(at: indexPath)
-            CoreDataStack.shared.mainContext.delete(task)
-            do {
-                try CoreDataStack.shared.mainContext.save()
-            } catch {
-                CoreDataStack.shared.mainContext.reset()
-                NSLog("Error saving managed object context: \(error)")
+            taskController.deleteTaskFromServer(task) { error in
+                if let error = error {
+                    print("Error deleting task from server: \(error)")
+                    return
+                }
+                
+                CoreDataStack.shared.mainContext.delete(task)
+                do {
+                    try CoreDataStack.shared.mainContext.save()
+                } catch {
+                    CoreDataStack.shared.mainContext.reset()
+                    NSLog("Error saving managed object context: \(error)")
+                }
             }
-            tableView.deleteRows(at: [indexPath], with: .fade)
         }    
     }
 
@@ -102,6 +108,12 @@ class TasksTableViewController: UITableViewController {
             if let detailVC = segue.destination as? TaskDetailViewController,
                 let indexPath = tableView.indexPathForSelectedRow {
                 detailVC.task = fetchedResultsController.object(at: indexPath)
+                detailVC.taskController = self.taskController
+            }
+        } else if segue.identifier == "CreateTaskModalSegue" {
+            if let navC = segue.destination as? UINavigationController,
+                let detailVC = navC.viewControllers.first as? TaskDetailViewController {
+                    detailVC.taskController = self.taskController
             }
         }
     }
